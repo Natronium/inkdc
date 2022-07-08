@@ -73,7 +73,27 @@ namespace inkdc
                 startIndex++;
             }
 
-            bool isFunction = container.content.Exists(c => c.IsControlCommand(ControlCommand.CommandType.PopFunction));
+            //TODO surely there's a better way to do this, right?
+            Predicate<Ink.Runtime.Object> popFunctionFinder = null;
+            popFunctionFinder = c =>
+            {
+                if (c.IsControlCommand(ControlCommand.CommandType.PopFunction))
+                {
+                    return true;
+                }
+                else if (c is Container innerContainer)
+                {
+                    return innerContainer.content.Exists(popFunctionFinder) ||
+                        System.Linq.Enumerable.ToList(innerContainer.namedContent.Values).Exists(
+                            n => n is Ink.Runtime.Object namedObj && popFunctionFinder(namedObj)
+                        );
+                }
+                else
+                {
+                    return false;
+                }
+            };
+            bool isFunction = container.content.Exists(popFunctionFinder);
 
             CompiledContainer compiledContainer = AnalyzeContainer(container, startIndex);
             if (IsDivertToFirstStitch(compiledContainer))
