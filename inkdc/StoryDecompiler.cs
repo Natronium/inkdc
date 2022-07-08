@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
@@ -16,7 +16,7 @@ namespace inkdc
         public Story Story { get; }
         private StringBuilder result = new StringBuilder();
         public int ChoiceNesting { get; set; }
-        public Dictionary<string, ParameterType[]> Signatures = new();
+        public Dictionary<string, CallSignature> Signatures = new();
 
         public string DecompileRoot()
         {
@@ -712,14 +712,16 @@ namespace inkdc
                 {
                     // TODO ignore for now
                 }
-                else if (obj is Divert divert && divert.pushesToStack)
+                else if (obj is Divert divert && (divert.pushesToStack || divert.isExternal))
                 {
                     var callTarget = divert.targetPointer.container;
+                    //TODO: handle external functions with no ink fallback
                     if (callTarget == null)
                     {
                         throw new NotSupportedException("Don't know how to decompile divert to unresolved container");
                     }
-                    BuildFunctionCall(stack, callTarget.name, DetectArgCount(callTarget));
+
+                    BuildFunctionCall(stack, callTarget.name, DetectArgCount(callTarget), divert.isExternal);
                     RecordCallSignature((FunctionCall)stack.Peek());
                 }
                 else
@@ -746,7 +748,7 @@ namespace inkdc
 
         void RecordCallSignature(FunctionCall call)
         {
-            ParameterType[] signature = new ParameterType[call.Operands.Count];
+            ParameterType[] parameterTypes = new ParameterType[call.Operands.Count];
             for (int i = 0; i < call.Operands.Count; i++)
             {
                 ParameterType type = ParameterType.Regular;
@@ -762,8 +764,9 @@ namespace inkdc
                     }
                 }
 
-                signature[i] = type;
+                parameterTypes[i] = type;
             }
+            var signature = new CallSignature(parameterTypes, call.IsExternal);
             Signatures.TryAdd(call.Name, signature);
         }
 
@@ -774,14 +777,14 @@ namespace inkdc
             stack.Push(new BinaryExpression(op, operand2, operand1));
         }
 
-        void BuildFunctionCall(Stack<ICompiledStructure> stack, string functionName, int argCount)
+        void BuildFunctionCall(Stack<ICompiledStructure> stack, string functionName, int argCount, bool external = false)
         {
             var args = new List<ICompiledStructure>();
             for (int i = 0; i < argCount; i++)
             {
                 args.Insert(0, stack.Pop());
             }
-            stack.Push(new FunctionCall(functionName, args));
+            stack.Push(new FunctionCall(functionName, args, external));
         }
 
         static HashSet<string> _binaryOperators = new()
@@ -791,6 +794,16 @@ namespace inkdc
     }
 
     public enum ParameterType { Regular, Divert, Ref }
+
+    public class CallSignature {
+        public CallSignature(ParameterType[] parameterTypes, bool isExternal) {
+            ParameterTypes = parameterTypes;
+            IsExternal = isExternal;
+        }
+
+        public ParameterType[] ParameterTypes { get; }
+        public bool IsExternal { get; }
+    }
 
     public interface ICompiledStructure
     {
@@ -884,13 +897,34 @@ namespace inkdc
 
         public void Decompile(StoryDecompiler dc)
         {
-            ParameterType[] signature;
+            CallSignature signature;
             if (!dc.Signatures.TryGetValue(Name, out signature))
             {
                 signature = null;
             }
 
             dc.EnsureNewLine();
+            if (IsFunction && (signature?.IsExternal ?? false))
+            {
+                dc.Out("EXTERNAL ");
+                dc.Out(Name);
+                dc.Out("(");
+                //TODO DRY?: this is copied from below. maybe should be broken out? idk
+                for (int i = 0; i < Parameters.Count; i++)
+                {
+                    if (i > 0)
+                    {
+                        dc.Out(", ");
+                    }
+                    if (signature != null && signature.ParameterTypes[i] == ParameterType.Ref)
+                    {
+                        dc.Out("ref ");
+                    }
+                    dc.Out(Parameters[i]);
+                }
+                dc.Out(")");
+                dc.EnsureNewLine();
+            }
             dc.Out("== ");
             if (IsFunction || signature != null)
             {
@@ -906,7 +940,7 @@ namespace inkdc
                     {
                         dc.Out(", ");
                     }
-                    if (signature != null && signature[i] == ParameterType.Ref)
+                    if (signature != null && signature.ParameterTypes[i] == ParameterType.Ref)
                     {
                         dc.Out("ref ");
                     }
@@ -1061,14 +1095,16 @@ namespace inkdc
 
     class FunctionCall : ICompiledStructure
     {
-        public FunctionCall(string name, List<ICompiledStructure> operands)
+        public FunctionCall(string name, List<ICompiledStructure> operands, bool external = false)
         {
             Name = name;
             Operands = operands;
+            IsExternal = external;
         }
 
         public string Name { get; }
         public List<ICompiledStructure> Operands { get; }
+        public bool IsExternal { get; }
 
         public void Decompile(StoryDecompiler dc)
         {
