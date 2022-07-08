@@ -1444,6 +1444,7 @@ namespace inkdc
             {
                 if (Conditions.Count > 1)
                 {
+                    dc.EnsureNewLine();
                     dc.Out("- ");
                 }
                 Conditions[i].Decompile(dc);
@@ -1454,6 +1455,7 @@ namespace inkdc
             {
                 if (IsMultiline())
                 {
+                    dc.EnsureNewLine();
                     dc.Out("- else:");
                 }
                 else
@@ -1462,6 +1464,7 @@ namespace inkdc
                 }
                 Branches[Branches.Count - 1].Decompile(dc);
             }
+            dc.EnsureNewLine();
             dc.Out("}");
         }
 
