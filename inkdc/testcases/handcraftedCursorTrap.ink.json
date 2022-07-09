@@ -1,0 +1,40 @@
+﻿{
+  "inkVersion": 20,
+  "root": [
+    [
+      [
+        "done",
+        {
+          "#n": "g-0"
+        }
+      ],
+      null
+    ],
+    "done",
+    {
+      "cursor_trap": [
+        "ev",
+        1,
+        2,
+        "+",
+        {
+          "VAR=": "some_var",
+          "re": true
+        },
+        "/ev",
+        null
+      ],
+      "global decl": [
+        "ev",
+        0,
+        {
+          "VAR=": "some_var"
+        },
+        "/ev",
+        "end",
+        null
+      ]
+    }
+  ],
+  "listDefs": {}
+}

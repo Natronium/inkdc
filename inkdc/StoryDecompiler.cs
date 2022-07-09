@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
@@ -1578,7 +1578,7 @@ namespace inkdc
             return Index >= content.Count;
         }
 
-         public Ink.Runtime.Object Current => content[Index];
+         public Ink.Runtime.Object Current => content[Math.Min(Index, content.Count - 1)];
 
         public Ink.Runtime.Object TakeNext()
         {
