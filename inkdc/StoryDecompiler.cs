@@ -726,6 +726,18 @@ namespace inkdc
                     {
                         BuildFunctionCall(stack, "RANDOM", 2);
                     }
+                    else if (controlCommand.commandType == ControlCommand.CommandType.ListFromInt)
+                    {
+                        throw new NotSupportedException("ListFromInt is not supported");
+                    }
+                    else if (controlCommand.commandType == ControlCommand.CommandType.ListRange)
+                    {
+                        BuildFunctionCall(stack, "LIST_RANGE", 3);
+                    }
+                    else if (controlCommand.commandType == ControlCommand.CommandType.ListRandom)
+                    {
+                        BuildFunctionCall(stack, "LIST_RANDOM", 1);
+                    }
                     else if (controlCommand.commandType == ControlCommand.CommandType.BeginString ||
                         controlCommand.commandType == ControlCommand.CommandType.EndString)
                     {
