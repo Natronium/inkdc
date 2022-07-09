@@ -694,7 +694,8 @@ namespace inkdc
                         BuildFunctionCall(stack, "POW", 2);
                     }
                     else if (call.name == "INT" || call.name == "FLOOR" || call.name == "FLOAT" ||
-                        call.name == "LIST_COUNT" || call.name == "LIST_MIN" || call.name == "LIST_MAX" || call.name == "LIST_RANDOM")
+                        call.name == "LIST_COUNT" || call.name == "LIST_MIN" || call.name == "LIST_MAX" || call.name == "LIST_ALL" ||
+                        call.name == "LIST_RANDOM" || call.name == "LIST_RANGE")
                     {
                         BuildFunctionCall(stack, call.name, 1);
                     }
