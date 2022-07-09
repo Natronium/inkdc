@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
@@ -263,7 +263,7 @@ namespace inkdc
             if (choicePoint.hasCondition)
             {
                 int startIndex = cursor.Index;
-                cursor.SkipToControlCommand(ControlCommand.CommandType.EvalEnd);
+                cursor.SkipToMatchingEvalEnd();
                 choiceData.Condition = AnalyzeExpression(container, startIndex, cursor.Index - 1);
             }
 
@@ -437,7 +437,7 @@ namespace inkdc
             var cursor = new ContainerCursor(container, index);
             cursor.SkipControlCommand(ControlCommand.CommandType.EvalStart);
             int conditionStart = cursor.Index;
-            if (!cursor.SkipToControlCommand(ControlCommand.CommandType.EvalEnd))
+            if (!cursor.SkipToMatchingEvalEnd())
             {
                 return null;
             }
@@ -492,7 +492,7 @@ namespace inkdc
                 {
                     childCursor.TakeNext();
                     int conditionStart = childCursor.Index;
-                    if (!childCursor.SkipToControlCommand(ControlCommand.CommandType.EvalEnd))
+                    if (!childCursor.SkipToMatchingEvalEnd())
                     {
                         return null;
                     }
@@ -612,7 +612,7 @@ namespace inkdc
             }
 
             int expressionStart = cursor.Index;
-            if (!cursor.SkipToControlCommand(ControlCommand.CommandType.EvalEnd))
+            if (!cursor.SkipToMatchingEvalEnd())
             {
                 return null;
             }
@@ -644,7 +644,7 @@ namespace inkdc
             }
             cursor.TakeNext();
             int startIndex = cursor.Index;
-            if (!cursor.SkipToControlCommand(ControlCommand.CommandType.EvalEnd))
+            if (!cursor.SkipToMatchingEvalEnd())
             {
                 return null;
             }
@@ -730,6 +730,18 @@ namespace inkdc
                         controlCommand.commandType == ControlCommand.CommandType.EndString)
                     {
                         // TODO ignore for now
+                    }
+                    else if (controlCommand.commandType == ControlCommand.CommandType.EvalOutput ||
+                        controlCommand.commandType == ControlCommand.CommandType.EvalEnd)
+                    {
+                        // end of eval context. nothing to do (i think)
+                    }
+                    else if (controlCommand.commandType == ControlCommand.CommandType.EvalStart)
+                    {
+                        ContainerCursor cursor = new(container, container.content.IndexOf(obj) + 1);
+                        int nestedStartIndex = cursor.Index;
+                        cursor.SkipToMatchingEvalEnd();
+                        stack.Push(AnalyzeExpression(container, nestedStartIndex, cursor.Index - 1));
                     }
                     else
                     {
@@ -1614,6 +1626,35 @@ namespace inkdc
                 {
                     Index++;
                     return true;
+                }
+                Index++;
+            }
+            return false;
+        }
+
+        public bool SkipToMatchingEvalEnd()
+        {
+            int evalContextDepth = 0;
+            while (Index < content.Count)
+            {
+                if (content[Index] is ControlCommand command)
+                {
+                    if (command.commandType == ControlCommand.CommandType.EvalStart)
+                    {
+                        evalContextDepth++;
+                    }
+                    else if (command.commandType == ControlCommand.CommandType.EvalEnd)
+                    {
+                        if (evalContextDepth == 0)
+                        {
+                            Index++;
+                            return true;
+                        }
+                        else 
+                        {
+                            evalContextDepth--;
+                        }
+                    }
                 }
                 Index++;
             }
