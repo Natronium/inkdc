@@ -1520,7 +1520,10 @@ namespace inkdc
                 }
                 Branches[Branches.Count - 1].Decompile(dc);
             }
-            dc.EnsureNewLine();
+            if (IsMultiline())
+            {
+                dc.EnsureNewLine();
+            }
             dc.Out("}");
         }
 
