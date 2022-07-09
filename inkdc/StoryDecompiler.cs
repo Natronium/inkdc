@@ -693,7 +693,8 @@ namespace inkdc
                     {
                         BuildFunctionCall(stack, "POW", 2);
                     }
-                    else if (call.name == "INT" || call.name == "FLOOR" || call.name == "FLOAT")
+                    else if (call.name == "INT" || call.name == "FLOOR" || call.name == "FLOAT" ||
+                        call.name == "LIST_COUNT" || call.name == "LIST_MIN" || call.name == "LIST_MAX" || call.name == "LIST_RANDOM")
                     {
                         BuildFunctionCall(stack, call.name, 1);
                     }
@@ -817,7 +818,7 @@ namespace inkdc
 
         static HashSet<string> _binaryOperators = new()
         {
-            "+", "-", "/", "*", "%", "==", "<", ">", ">=", "<=", "!=", "&&", "||", "?", "!?"
+            "+", "-", "/", "*", "%", "==", "<", ">", ">=", "<=", "!=", "&&", "||", "?", "!?", "^"
         };
     }
 
