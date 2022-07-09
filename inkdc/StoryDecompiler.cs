@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
@@ -62,7 +62,7 @@ namespace inkdc
             }
         }
 
-        CompiledKnot AnalyzeKnot(string name, Container container)
+        (List<string>, int) FindParameters(Container container)
         {
             List<string> parameters = new();
             int startIndex = 0;
@@ -72,6 +72,13 @@ namespace inkdc
                 parameters.Insert(0, varAssign.variableName);
                 startIndex++;
             }
+            return (parameters, startIndex);
+        }
+
+        CompiledKnot AnalyzeKnot(string name, Container container)
+        {
+            (List<string> parameters, int startIndex) = FindParameters(container);
+            
 
             //TODO surely there's a better way to do this, right?
             Predicate<Ink.Runtime.Object> popFunctionFinder = null;
@@ -109,7 +116,8 @@ namespace inkdc
                     var namedContent = container.namedOnlyContent[stitchName];
                     if (namedContent is Container namedContainer)
                     {
-                        knot.Stitches.Add(new CompiledStitch(stitchName, AnalyzeContainer(namedContainer)));
+                        (var stitchParameters, var stitchStartIndex) = FindParameters(namedContainer);
+                        knot.Stitches.Add(new CompiledStitch(stitchName, AnalyzeContainer(namedContainer, stitchStartIndex), stitchParameters));
                     }
                 }
             }
@@ -983,16 +991,34 @@ namespace inkdc
     {
         private readonly string name;
         private readonly CompiledContainer container;
+        private readonly List<string> parameters;
 
-        public CompiledStitch(string name, CompiledContainer container)
+        public CompiledStitch(string name, CompiledContainer container, List<string> parameters)
         {
             this.name = name;
             this.container = container;
+            this.parameters = parameters;
         }
 
         public void Decompile(StoryDecompiler dc)
         {
-            dc.Out("= " + name + "\n");
+            dc.Out("= " + name);
+            if (parameters.Count > 0)
+            {
+                //TODO DRY: the same code shows up (twice!) in CompiledKnot.Decompile too
+                dc.Out("(");
+                for (int i = 0; i < parameters.Count; i++)
+                {
+                    if (i > 0)
+                    {
+                        dc.Out(", ");
+                    }
+                    // TODO ref parameters
+                    dc.Out(parameters[i]);
+                }
+                dc.Out(")");
+            }
+            dc.EnsureNewLine();
             container.Decompile(dc);
         }
     }
