@@ -1556,6 +1556,15 @@ namespace inkdc
         {
             for (int targetIndex = Index; targetIndex < content.Count; targetIndex++)
             {
+                if (content[targetIndex].IsControlCommand(ControlCommand.CommandType.EvalStart))
+                {
+                    // don't go into another eval context looking for a varAssign
+                    // (there seem to be cases where it makes sense for the varAssign to be outside of the eval context though)
+                    // at the very least temp= assignments seem to happen post-EvalEnd?
+                    // e.g. something like `~ temp temp_var = some_func()` compiles to:
+                    //  "ev", {"f()": "some_func"}, "/ev", {"temp=": "temp_var"}
+                    return false;
+                }
                 if (content[targetIndex] is VariableAssignment)
                 {
                     Index = targetIndex + 1;
