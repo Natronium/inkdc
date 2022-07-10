@@ -893,6 +893,10 @@ namespace inkdc
                     throw new NotSupportedException("Don't know how to decompile " + Obj);
                 }
             }
+            else if (Obj is Glue)
+            {
+                dc.Out("<>");
+            }
             else if (Obj is Tag tag)
             {
                 // TODO better tag handling
