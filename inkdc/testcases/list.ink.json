@@ -1,0 +1,1 @@
+﻿{"inkVersion":20,"root":[["ev",{"VAR?":"boiling"},"/ev",{"VAR=":"kettleState","re":true},["done",{"#n":"g-0"}],null],"done",{"global decl":["ev",{"list":{},"origins":["heatedWaterStates"]},{"VAR=":"heatedWaterStates"},{"list":{}},{"VAR=":"kettleState"},"/ev","end",null]}],"listDefs":{"heatedWaterStates":{"cold":1,"boiling":2,"recently_boiled":3}}}

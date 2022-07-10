@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Ink.Runtime;
 
@@ -1087,6 +1088,35 @@ namespace inkdc
             {
                 dc.Out(pointerValue.variableName);
             }
+            else if (Value is ListValue listValue && listValue.value.Count == 0)
+            {
+                var origins = listValue.value.origins;
+                if (origins == null || origins.Count == 0)
+                {
+                    dc.Out("()");
+                }
+                else if (origins.Count == 1)
+                {   
+                    //TODO surely there's a less convoluted way to do this?
+                    var stringifiedDefs = origins[0].items.Select(
+                        (kv, index) =>
+                        {
+                            var (item, value) = kv;
+                            string result = item.itemName;
+                            if (value != index + 1)
+                            {
+                                result += $" = {value}";
+                            }
+                            return result;
+                        }
+                    );
+                    dc.Out(String.Join(", ", stringifiedDefs));
+                }
+                else
+                {
+                    throw new NotSupportedException("Don't know how to decompile empty ListValues with multiple origins");
+                }
+            }
             else
             {
                 dc.Out(Value.ToString());
@@ -1347,7 +1377,17 @@ namespace inkdc
         {
             if (isDeclaration)
             {
-                dc.Out(global ? "VAR " : "~ temp ");
+                if (initializer is CompiledValue cv
+                    && cv.Value is ListValue listValue
+                    && listValue.value.Count == 0
+                    && listValue.value.origins != null)
+                {
+                    dc.Out("LIST ");
+                }
+                else 
+                {
+                    dc.Out(global ? "VAR " : "~ temp ");
+                }
             }
             else {
                 dc.Out("~ ");
