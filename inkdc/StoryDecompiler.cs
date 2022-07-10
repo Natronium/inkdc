@@ -531,6 +531,12 @@ namespace inkdc
 
             if (branches.Count > 0)
             {
+                if (branches.Count == conditions.Count)
+                {
+                    // we have no else case, which generates a branch but no condition
+                    // because we have no else, there's a bonus PopEvaluatedValue to clean up, which needs to be skipped
+                    index++;
+                }
                 if (index < container.content.Count &&
                     container.content[index].IsControlCommand(ControlCommand.CommandType.NoOp))
                 {
