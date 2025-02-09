@@ -730,6 +730,10 @@ namespace inkdc
                     {
                         BuildFunctionCall(stack, "TURNS_SINCE", 1);
                     }
+                    else if (controlCommand.commandType == ControlCommand.CommandType.SeedRandom)
+                    {
+                        BuildFunctionCall(stack, "SEED_RANDOM", 1);
+                    }
                     else if (controlCommand.commandType == ControlCommand.CommandType.Random)
                     {
                         BuildFunctionCall(stack, "RANDOM", 2);
