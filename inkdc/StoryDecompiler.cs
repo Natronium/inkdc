@@ -206,7 +206,7 @@ namespace inkdc
                         index++;
                         result.Add(new DivertStatement(divert.targetPath,
                             divert.pushesToStack && divert.stackPushType == PushPopType.Tunnel,
-                            true));
+                            true, divert.variableDivertName, divert.hasVariableTarget));
                     }
                     else
                     {
@@ -217,7 +217,7 @@ namespace inkdc
                 {
                     result.Add(new DivertStatement(divert.targetPath,
                         divert.pushesToStack && divert.stackPushType == PushPopType.Tunnel,
-                        false));
+                        false, divert.variableDivertName, divert.hasVariableTarget));
                 }
                 else
                 {
@@ -577,7 +577,7 @@ namespace inkdc
                 index = endIndex + 1;
                 return new DivertStatement(divert.targetPath,
                     divert.pushesToStack && divert.stackPushType == PushPopType.Tunnel,
-                    false,
+                    false, divert.variableDivertName, divert.hasVariableTarget,
                     stack);
             }
             if (container.content[endIndex].IsControlCommand(ControlCommand.CommandType.PopFunction))
@@ -730,6 +730,10 @@ namespace inkdc
                     {
                         BuildFunctionCall(stack, "TURNS_SINCE", 1);
                     }
+                    else if (controlCommand.commandType == ControlCommand.CommandType.SeedRandom)
+                    {
+                        BuildFunctionCall(stack, "SEED_RANDOM", 1);
+                    }
                     else if (controlCommand.commandType == ControlCommand.CommandType.Random)
                     {
                         BuildFunctionCall(stack, "RANDOM", 2);
@@ -775,15 +779,24 @@ namespace inkdc
                 }
                 else if (obj is Divert divert && (divert.pushesToStack || divert.isExternal))
                 {
-                    var callTarget = divert.targetPointer.container;
-                    //TODO: handle external functions with no ink fallback
-                    if (callTarget == null)
+                    if (divert.hasVariableTarget)
                     {
-                        throw new NotSupportedException("Don't know how to decompile divert to unresolved container");
+                        BuildFunctionCall(stack, divert.variableDivertName, 0, false);
+                        RecordCallSignature((FunctionCall)stack.Peek());
+                        //throw new NotSupportedException("Don't know how to decompile divert to unresolved container");
                     }
+                    else
+                    {
+                        var callTarget = divert.targetPointer.container;
+                        //TODO: handle external functions with no ink fallback
+                        if (callTarget == null)
+                        {
+                            throw new NotSupportedException("Don't know how to decompile divert to unresolved container");
+                        }
 
-                    BuildFunctionCall(stack, callTarget.name, DetectArgCount(callTarget), divert.isExternal);
-                    RecordCallSignature((FunctionCall)stack.Peek());
+                        BuildFunctionCall(stack, callTarget.name, DetectArgCount(callTarget), divert.isExternal);
+                        RecordCallSignature((FunctionCall)stack.Peek());
+                    }
                 }
                 else
                 {
@@ -1088,33 +1101,62 @@ namespace inkdc
             {
                 dc.Out(pointerValue.variableName);
             }
-            else if (Value is ListValue listValue && listValue.value.Count == 0)
+            else if (Value is ListValue listValue)
             {
-                var origins = listValue.value.origins;
-                if (origins == null || origins.Count == 0)
+                var varNameIndex = listValue.path.lastComponent.index + 1;
+                Container varParent = listValue.parent as Container;
+                var varContent = varParent.content[varNameIndex] as VariableAssignment;
+                var varName = varContent.variableName;
+                var valueOriginName = "";
+                if (listValue.value.originNames != null)
                 {
-                    dc.Out("()");
-                }
-                else if (origins.Count == 1)
-                {   
-                    //TODO surely there's a less convoluted way to do this?
-                    var stringifiedDefs = origins[0].items.Select(
-                        (kv, index) =>
-                        {
-                            var (item, value) = kv;
-                            string result = item.itemName;
-                            if (value != index + 1)
+                    valueOriginName = listValue.value.originNames[0];
+                } //This section i added is godawfull, but it works
+
+                if (varName == valueOriginName) 
+                {
+                    var origins = listValue.value.origins;
+                    if (origins == null || origins.Count == 0)
+                    {
+                        dc.Out("()");
+                    }
+                    else if (origins.Count == 1)
+                    {   
+                        //TODO surely there's a less convoluted way to do this?
+                        var stringifiedDefs = origins[0].items.Select(
+                            (kv, index) =>
                             {
-                                result += $" = {value}";
+                                var (item, value) = kv;
+                                string result = item.itemName;
+                                if (value != index + 1)
+                                {
+                                    result += $" = {value}";
+                                }
+                                if (listValue.value.Count > 0)
+                                {
+                                    foreach (var listitem in listValue.value)
+                                    {
+                                        var (litem, lvalue) = listitem;
+                                        if (litem.itemName == item.itemName)
+                                        {
+                                            result = "(" + result + ")";
+                                            continue;
+                                        }
+                                    }
+                                }
+                                return result;
                             }
-                            return result;
-                        }
-                    );
-                    dc.Out(String.Join(", ", stringifiedDefs));
+                        );
+                        dc.Out(String.Join(", ", stringifiedDefs));
+                    }
+                    else
+                    {
+                        throw new NotSupportedException("Don't know how to decompile empty ListValues with multiple origins");
+                    }
                 }
                 else
                 {
-                    throw new NotSupportedException("Don't know how to decompile empty ListValues with multiple origins");
+                    dc.Out("(" + Value.ToString() + ")");
                 }
             }
             else
@@ -1240,17 +1282,21 @@ namespace inkdc
 
     class DivertStatement : ICompiledStructure
     {
-        public DivertStatement(Path targetPath, bool isTunnel, bool isThread, Stack<ICompiledStructure> parameters = null)
+        public DivertStatement(Path targetPath, bool isTunnel, bool isThread, string variableDivertName, bool hasVariableTarget, Stack<ICompiledStructure> parameters = null)
         {
             TargetPath = targetPath;
             IsTunnel = isTunnel;
             IsThread = isThread;
+            VariableDivertName = variableDivertName;
+            HasVariableTarget = hasVariableTarget;
             Parameters = parameters != null ? parameters.ToArray() : new ICompiledStructure[0];
         }
 
         public Path TargetPath { get; }
         public bool IsTunnel { get; }
         public bool IsThread { get; }
+        public string VariableDivertName { get; }
+        public bool HasVariableTarget { get; }
         public ICompiledStructure[] Parameters { get; }
 
         public void Decompile(StoryDecompiler dc)
@@ -1265,7 +1311,14 @@ namespace inkdc
                 {
                     dc.Out("-> ");
                 }
-                dc.Out(TargetPath.componentsString);
+                if (HasVariableTarget)
+                {
+                    dc.Out(VariableDivertName);
+                }
+                else
+                {
+                    dc.Out(TargetPath.componentsString);
+                }
                 if (Parameters.Length != 0)
                 {
                     dc.Out("(");
@@ -1290,6 +1343,10 @@ namespace inkdc
 
         private bool IsGeneratedDivert(StoryDecompiler dc)
         {
+            if (HasVariableTarget)
+            {
+                return false;
+            }
             SearchResult searchResult = dc.Story.ContentAtPath(TargetPath);
             if (searchResult.container != null && searchResult.container.IsDone())
             {
@@ -1372,6 +1429,14 @@ namespace inkdc
             this.global = global;
             this.isDeclaration = isDeclaration;
         }
+        private bool IsOriginNameSame(ListValue lValue, String vName)
+        {
+            if (lValue.value.originNames != null)
+            {
+                return lValue.value.originNames[0] == vName;
+            }
+            return false;
+        }
 
         public void Decompile(StoryDecompiler dc)
         {
@@ -1379,8 +1444,8 @@ namespace inkdc
             {
                 if (initializer is CompiledValue cv
                     && cv.Value is ListValue listValue
-                    && listValue.value.Count == 0
-                    && listValue.value.origins != null)
+                    && (IsOriginNameSame(listValue, variableName) || listValue.value.Count == 0
+                    && listValue.value.origins != null))
                 {
                     dc.Out("LIST ");
                 }
