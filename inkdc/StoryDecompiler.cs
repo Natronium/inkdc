@@ -206,7 +206,7 @@ namespace inkdc
                         index++;
                         result.Add(new DivertStatement(divert.targetPath,
                             divert.pushesToStack && divert.stackPushType == PushPopType.Tunnel,
-                            true));
+                            true, divert.variableDivertName, divert.hasVariableTarget));
                     }
                     else
                     {
@@ -217,7 +217,7 @@ namespace inkdc
                 {
                     result.Add(new DivertStatement(divert.targetPath,
                         divert.pushesToStack && divert.stackPushType == PushPopType.Tunnel,
-                        false));
+                        false, divert.variableDivertName, divert.hasVariableTarget));
                 }
                 else
                 {
@@ -577,7 +577,7 @@ namespace inkdc
                 index = endIndex + 1;
                 return new DivertStatement(divert.targetPath,
                     divert.pushesToStack && divert.stackPushType == PushPopType.Tunnel,
-                    false,
+                    false, divert.variableDivertName, divert.hasVariableTarget,
                     stack);
             }
             if (container.content[endIndex].IsControlCommand(ControlCommand.CommandType.PopFunction))
@@ -779,15 +779,24 @@ namespace inkdc
                 }
                 else if (obj is Divert divert && (divert.pushesToStack || divert.isExternal))
                 {
-                    var callTarget = divert.targetPointer.container;
-                    //TODO: handle external functions with no ink fallback
-                    if (callTarget == null)
+                    if (divert.hasVariableTarget)
                     {
-                        throw new NotSupportedException("Don't know how to decompile divert to unresolved container");
+                        BuildFunctionCall(stack, divert.variableDivertName, 0, false);
+                        RecordCallSignature((FunctionCall)stack.Peek());
+                        //throw new NotSupportedException("Don't know how to decompile divert to unresolved container");
                     }
+                    else
+                    {
+                        var callTarget = divert.targetPointer.container;
+                        //TODO: handle external functions with no ink fallback
+                        if (callTarget == null)
+                        {
+                            throw new NotSupportedException("Don't know how to decompile divert to unresolved container");
+                        }
 
-                    BuildFunctionCall(stack, callTarget.name, DetectArgCount(callTarget), divert.isExternal);
-                    RecordCallSignature((FunctionCall)stack.Peek());
+                        BuildFunctionCall(stack, callTarget.name, DetectArgCount(callTarget), divert.isExternal);
+                        RecordCallSignature((FunctionCall)stack.Peek());
+                    }
                 }
                 else
                 {
@@ -1273,17 +1282,21 @@ namespace inkdc
 
     class DivertStatement : ICompiledStructure
     {
-        public DivertStatement(Path targetPath, bool isTunnel, bool isThread, Stack<ICompiledStructure> parameters = null)
+        public DivertStatement(Path targetPath, bool isTunnel, bool isThread, string variableDivertName, bool hasVariableTarget, Stack<ICompiledStructure> parameters = null)
         {
             TargetPath = targetPath;
             IsTunnel = isTunnel;
             IsThread = isThread;
+            VariableDivertName = variableDivertName;
+            HasVariableTarget = hasVariableTarget;
             Parameters = parameters != null ? parameters.ToArray() : new ICompiledStructure[0];
         }
 
         public Path TargetPath { get; }
         public bool IsTunnel { get; }
         public bool IsThread { get; }
+        public string VariableDivertName { get; }
+        public bool HasVariableTarget { get; }
         public ICompiledStructure[] Parameters { get; }
 
         public void Decompile(StoryDecompiler dc)
@@ -1298,7 +1311,14 @@ namespace inkdc
                 {
                     dc.Out("-> ");
                 }
-                dc.Out(TargetPath.componentsString);
+                if (HasVariableTarget)
+                {
+                    dc.Out(VariableDivertName);
+                }
+                else
+                {
+                    dc.Out(TargetPath.componentsString);
+                }
                 if (Parameters.Length != 0)
                 {
                     dc.Out("(");
@@ -1322,6 +1342,11 @@ namespace inkdc
 
 
         private bool IsGeneratedDivert(StoryDecompiler dc)
+        {
+            if (HasVariableTarget)
+            {
+                return false;
+            }
             SearchResult searchResult = dc.Story.ContentAtPath(TargetPath);
             if (searchResult.container != null && searchResult.container.IsDone())
             {
