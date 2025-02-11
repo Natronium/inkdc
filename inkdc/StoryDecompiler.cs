@@ -1092,33 +1092,62 @@ namespace inkdc
             {
                 dc.Out(pointerValue.variableName);
             }
-            else if (Value is ListValue listValue && listValue.value.Count == 0)
+            else if (Value is ListValue listValue)
             {
-                var origins = listValue.value.origins;
-                if (origins == null || origins.Count == 0)
+                var varNameIndex = listValue.path.lastComponent.index + 1;
+                Container varParent = listValue.parent as Container;
+                var varContent = varParent.content[varNameIndex] as VariableAssignment;
+                var varName = varContent.variableName;
+                var valueOriginName = "";
+                if (listValue.value.originNames != null)
                 {
-                    dc.Out("()");
-                }
-                else if (origins.Count == 1)
-                {   
-                    //TODO surely there's a less convoluted way to do this?
-                    var stringifiedDefs = origins[0].items.Select(
-                        (kv, index) =>
-                        {
-                            var (item, value) = kv;
-                            string result = item.itemName;
-                            if (value != index + 1)
+                    valueOriginName = listValue.value.originNames[0];
+                } //This section i added is godawfull, but it works
+
+                if (varName == valueOriginName) 
+                {
+                    var origins = listValue.value.origins;
+                    if (origins == null || origins.Count == 0)
+                    {
+                        dc.Out("()");
+                    }
+                    else if (origins.Count == 1)
+                    {   
+                        //TODO surely there's a less convoluted way to do this?
+                        var stringifiedDefs = origins[0].items.Select(
+                            (kv, index) =>
                             {
-                                result += $" = {value}";
+                                var (item, value) = kv;
+                                string result = item.itemName;
+                                if (value != index + 1)
+                                {
+                                    result += $" = {value}";
+                                }
+                                if (listValue.value.Count > 0)
+                                {
+                                    foreach (var listitem in listValue.value)
+                                    {
+                                        var (litem, lvalue) = listitem;
+                                        if (litem.itemName == item.itemName)
+                                        {
+                                            result = "(" + result + ")";
+                                            continue;
+                                        }
+                                    }
+                                }
+                                return result;
                             }
-                            return result;
-                        }
-                    );
-                    dc.Out(String.Join(", ", stringifiedDefs));
+                        );
+                        dc.Out(String.Join(", ", stringifiedDefs));
+                    }
+                    else
+                    {
+                        throw new NotSupportedException("Don't know how to decompile empty ListValues with multiple origins");
+                    }
                 }
                 else
                 {
-                    throw new NotSupportedException("Don't know how to decompile empty ListValues with multiple origins");
+                    dc.Out("(" + Value.ToString() + ")");
                 }
             }
             else
@@ -1293,7 +1322,6 @@ namespace inkdc
 
 
         private bool IsGeneratedDivert(StoryDecompiler dc)
-        {
             SearchResult searchResult = dc.Story.ContentAtPath(TargetPath);
             if (searchResult.container != null && searchResult.container.IsDone())
             {
@@ -1376,6 +1404,14 @@ namespace inkdc
             this.global = global;
             this.isDeclaration = isDeclaration;
         }
+        private bool IsOriginNameSame(ListValue lValue, String vName)
+        {
+            if (lValue.value.originNames != null)
+            {
+                return lValue.value.originNames[0] == vName;
+            }
+            return false;
+        }
 
         public void Decompile(StoryDecompiler dc)
         {
@@ -1383,8 +1419,8 @@ namespace inkdc
             {
                 if (initializer is CompiledValue cv
                     && cv.Value is ListValue listValue
-                    && listValue.value.Count == 0
-                    && listValue.value.origins != null)
+                    && (IsOriginNameSame(listValue, variableName) || listValue.value.Count == 0
+                    && listValue.value.origins != null))
                 {
                     dc.Out("LIST ");
                 }
